@@ -1,0 +1,131 @@
+name: Build & Deploy Docker Image
+
+on:
+  workflow_call:
+    inputs:
+      context:
+        required: true
+        type: string
+      gpr_registry:
+        default: 'docker.pkg.github.com'
+        type: string
+      gpr_repository:
+        default: ${{ github.repository }}
+        type: string
+      ecr_repository:
+        required: true
+        type: string
+      artifact_name:
+        default: ''
+        type: string
+      artifact_download_path:
+        default: ''
+        type: string
+      image_name:
+        required: true
+        type: string
+      image_tag:
+        default: ${{ (github.ref == 'refs/heads/main' && 'prod') || 'dev' }}-${{ github.sha }}
+        type: string
+    secrets:
+      DOCKERHUB_USER:
+        required: true
+      DOCKERHUB_TOKEN:
+        required: true
+      GHCR_USER:
+        required: true
+      GHCR_TOKEN:
+        required: true
+      AWS_REGION:
+        required: true
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+
+jobs:
+  deploy:
+    name: push image
+    runs-on: [self-hosted, linux, maven]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Download artifact
+        if: inputs.artifact_name != '' && inputs.artifact_download_path != ''
+        uses: actions/download-artifact@v2
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: ${{ inputs.artifact_download_path }}
+
+      - name: Login to DockerHub
+        run: docker login --username ${{ secrets.DOCKERHUB_USER }} --password ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Login to ghcr.io
+        run: docker login ghcr.io --username ${{ secrets.GHCR_USER }} --password ${{ secrets.GHCR_TOKEN }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Publish Docker Image to AWS
+        env:
+          CONTEXT: ${{ inputs.context }}
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ inputs.ecr_repository }}
+          IMAGE_NAME: ${{ inputs.image_name }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY/$IMAGE_NAME:$IMAGE_TAG $CONTEXT
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY/$IMAGE_NAME:$IMAGE_TAG
+          docker image rm $ECR_REGISTRY/$ECR_REPOSITORY/$IMAGE_NAME:$IMAGE_TAG
+
+      - name: Publish latest Docker Image to AWS
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        env:
+          CONTEXT: ${{ inputs.context }}
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ inputs.ecr_repository }}
+          IMAGE_NAME: ${{ inputs.image_name }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY/$IMAGE_NAME:latest $CONTEXT
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY/$IMAGE_NAME:latest
+          docker image rm $ECR_REGISTRY/$ECR_REPOSITORY/$IMAGE_NAME:latest
+
+      - name: Logout of Amazon ECR
+        if: always()
+        run: docker logout ${{ steps.login-ecr.outputs.registry }}
+
+      # Deploy main branch to GitHub as well
+      - name: Login to GitHub GPR
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        env:
+          GPR_REGISTRY: ${{ inputs.gpr_registry }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ github.token }}
+        run: docker login docker.pkg.github.com --username $GHCR_USER --password $GHCR_TOKEN
+
+      - name: Publish Docker Image to GitHub
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        env:
+          CONTEXT: ${{ inputs.context }}
+          GPR_REGISTRY: ${{ inputs.gpr_registry }}
+          GPR_REPOSITORY: ${{ inputs.gpr_repository }}
+          IMAGE_NAME: ${{ inputs.image_name }}
+        run: |
+          docker build -t $GPR_REGISTRY/$GPR_REPOSITORY/$IMAGE_NAME:latest $CONTEXT
+          docker push $GPR_REGISTRY/$GPR_REPOSITORY/$IMAGE_NAME:latest
+          docker image rm $GPR_REGISTRY/$GPR_REPOSITORY/$IMAGE_NAME:latest
+
+      - name: Delete artifact
+        if: always() && inputs.artifact_name != ''
+        uses: joutvhu/delete-artifact@v1
+        with:
+          name: ${{ inputs.artifact_name }}
