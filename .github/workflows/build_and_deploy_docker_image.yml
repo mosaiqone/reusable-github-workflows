@@ -110,7 +110,7 @@ jobs:
           GPR_REGISTRY: ${{ inputs.gpr_registry }}
           GHCR_USER: ${{ github.actor }}
           GHCR_TOKEN: ${{ github.token }}
-        run: docker login docker.pkg.github.com --username $GHCR_USER --password $GHCR_TOKEN
+        run: docker login $GPR_REGISTRY --username $GHCR_USER --password $GHCR_TOKEN
 
       - name: Publish Docker Image to GitHub
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
