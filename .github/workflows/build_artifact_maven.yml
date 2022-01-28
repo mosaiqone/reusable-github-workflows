@@ -1,0 +1,42 @@
+name: Build with Maven
+
+on:
+  workflow_call:
+    inputs:
+      context:
+        required: true
+        type: string
+      application_module:
+        default: 'application'
+        type: string
+    secrets:
+      MVN_GITHUB_USER:
+        required: true
+      MVN_GITHUB_TOKEN:
+        required: true
+
+jobs:
+  build:
+    runs-on: [self-hosted, linux, maven]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Set current date as env variable
+        run: |
+          echo TIMESTAMP=$(date +'%Y%m%d%H%M%S') >> $GITHUB_ENV
+          echo COMMIT_ID=$(git rev-parse --short HEAD) >> $GITHUB_ENV
+
+      - name: Build with Maven
+        env:
+          USENAME: ${{ secrets.MVN_GITHUB_USER }}
+          PASSWORD: ${{ secrets.MVN_GITHUB_TOKEN }}
+        run:  |
+          mvn -B -U -f ${{ inputs.context }} -Drevision=$TIMESTAMP.$COMMIT_ID clean package --settings .github/settings.xml
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: application.jar
+          path: ${{ inputs.context }}/${{ inputs.application_module }}/target/*.jar
+          retention-days: 1
+          if-no-files-found: error
