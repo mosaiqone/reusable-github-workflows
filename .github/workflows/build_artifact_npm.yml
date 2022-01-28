@@ -15,6 +15,9 @@ on:
       node_check_latest:
         default: true
         type: boolean
+      artifact_name:
+        default: ''
+        type: string
       context:
         required: true
         type: string
@@ -48,7 +51,7 @@ jobs:
 
       - uses: actions/upload-artifact@v2
         with:
-          name: ${{ inputs.context }}
+          name: ${{ (inputs.artifact_name != '' && inputs.artifact_name) || inputs.context }}
           path: ./${{ inputs.context }}/build/
           retention-days: 1
           if-no-files-found: error
