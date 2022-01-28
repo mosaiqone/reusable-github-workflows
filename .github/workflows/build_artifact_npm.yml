@@ -1,0 +1,54 @@
+name: Build with npm
+
+on:
+  workflow_call:
+    inputs:
+      node_version:
+        default: '16.x'
+        type: string
+      node_registry_url:
+        default: 'https://npm.pkg.github.com'
+        type: string
+      node_scope:
+        default: '@mosaiqone'
+        type: string
+      node_check_latest:
+        default: true
+        type: boolean
+      context:
+        required: true
+        type: string
+    secrets:
+      NODE_AUTH_TOKEN:
+        required: true
+
+
+jobs:
+  build:
+    runs-on: [self-hosted, linux, node]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Build with npm
+        uses: actions/setup-node@v2
+        with:
+          node-version: ${{ inputs.node_version }}
+          registry-url: ${{ inputs.node_registry_url }}
+          scope: ${{ inputs.node_scope }}
+          check-latest: ${{ inputs.node_check_latest}}
+
+      - run: npm clean-install
+        working-directory: ${{ inputs.context }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+
+      - run: npm run build
+        working-directory: ${{ inputs.context }}
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: ${{ inputs.context }}
+          path: ./${{ inputs.context }}/build/
+          retention-days: 1
+          if-no-files-found: error
