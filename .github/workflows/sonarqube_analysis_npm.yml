@@ -1,0 +1,56 @@
+name: Build with npm
+
+on:
+  workflow_call:
+    inputs:
+      node_version:
+        default: '16.x'
+        type: string
+      node_registry_url:
+        default: 'https://npm.pkg.github.com'
+        type: string
+      node_scope:
+        default: '@mosaiqone'
+        type: string
+      node_check_latest:
+        default: true
+        type: boolean
+      context:
+        required: true
+        type: string
+    secrets:
+      NODE_AUTH_TOKEN:
+        required: true
+      SONAR_HOST_URL:
+        required: true
+      SONAR_TOKEN:
+        required: true
+
+jobs:
+  analyze:
+    runs-on: [self-hosted, linux, node]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Build with npm
+        uses: actions/setup-node@v2
+        with:
+          node-version: ${{ inputs.node_version }}
+          registry-url: ${{ inputs.node_registry_url }}
+          scope: ${{ inputs.node_scope }}
+          check-latest: ${{ inputs.node_check_latest}}
+
+      - name: Install npm dependencies
+        run: npm ci
+        working-directory: ${{ inputs.context }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+
+      - name: SonarQube Typescript analysis
+        run: |
+          npm run sonarqube -- \
+          -D sonar.host.url=${{ secrets.SONAR_HOST_URL }} \
+          -D sonar.login=${{ secrets.SONAR_TOKEN }} \
+          -D sonar.branch.name=${GITHUB_REF_NAME}
+        working-directory: ${{ inputs.context }}
