@@ -6,8 +6,8 @@ on:
       context:
         required: true
         type: string
-      application_module:
-        default: 'application'
+      application_path:
+        default: 'application/target/*.jar'
         type: string
     secrets:
       MVN_GITHUB_USER:
@@ -37,6 +37,6 @@ jobs:
       - uses: actions/upload-artifact@v2
         with:
           name: application.jar
-          path: ${{ inputs.context }}/${{ inputs.application_module }}/target/*.jar
+          path: ${{ inputs.context }}/${{ inputs.application_path }}
           retention-days: 1
           if-no-files-found: error

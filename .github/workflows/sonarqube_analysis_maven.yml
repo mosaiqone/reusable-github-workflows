@@ -6,9 +6,6 @@ on:
       context:
         required: true
         type: string
-      application_module:
-        default: 'application'
-        type: string
     secrets:
       MVN_GITHUB_USER:
         required: true
