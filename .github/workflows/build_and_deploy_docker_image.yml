@@ -51,6 +51,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
+      - name: Set current date as env variable
+        run: |
+          echo TIMESTAMP=$(date +'%Y%m%d%H%M%S') >> $GITHUB_ENV
+          echo COMMIT_ID=$(git rev-parse --short HEAD) >> $GITHUB_ENV
+
       - name: Download artifact
         if: inputs.artifact_name != '' && inputs.artifact_download_path != ''
         uses: actions/download-artifact@v2
@@ -83,18 +88,8 @@ jobs:
           IMAGE_NAME: ${{ inputs.image_name }}
           IMAGE_TAG: ${{ inputs.image_tag }}
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY/$IMAGE_NAME:$IMAGE_TAG $CONTEXT
+          docker build --build-arg REVISION=$TIMESTAMP.$COMMIT_ID -t $ECR_REGISTRY/$ECR_REPOSITORY/$IMAGE_NAME:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY/$IMAGE_NAME:latest $CONTEXT
           docker push $ECR_REGISTRY/$ECR_REPOSITORY/$IMAGE_NAME:$IMAGE_TAG
-
-      - name: Publish latest Docker Image to AWS
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-        env:
-          CONTEXT: ${{ inputs.context }}
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ inputs.ecr_repository }}
-          IMAGE_NAME: ${{ inputs.image_name }}
-        run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY/$IMAGE_NAME:latest $CONTEXT
           docker push $ECR_REGISTRY/$ECR_REPOSITORY/$IMAGE_NAME:latest
 
       - name: Logout of Amazon ECR
@@ -118,7 +113,7 @@ jobs:
           GPR_REPOSITORY: ${{ inputs.gpr_repository }}
           IMAGE_NAME: ${{ inputs.image_name }}
         run: |
-          docker build -t $GPR_REGISTRY/$GPR_REPOSITORY/$IMAGE_NAME:latest $CONTEXT
+          docker build --build-arg REVISION=$TIMESTAMP.$COMMIT_ID -t $GPR_REGISTRY/$GPR_REPOSITORY/$IMAGE_NAME:latest $CONTEXT
           docker push $GPR_REGISTRY/$GPR_REPOSITORY/$IMAGE_NAME:latest
 
       - name: Delete artifact
