@@ -49,7 +49,7 @@ jobs:
     runs-on: [self-hosted, linux, maven]
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Set current date as env variable
         run: |
@@ -58,7 +58,7 @@ jobs:
 
       - name: Download artifact
         if: inputs.artifact_name != '' && inputs.artifact_download_path != ''
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: ${{ inputs.artifact_name }}
           path: ${{ inputs.artifact_download_path }}

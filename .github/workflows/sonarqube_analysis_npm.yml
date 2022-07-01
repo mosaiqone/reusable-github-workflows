@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       node_version:
-        default: '16.x'
+        default: 16
         type: string
       node_registry_url:
         default: 'https://npm.pkg.github.com'
@@ -31,15 +31,24 @@ jobs:
     runs-on: [self-hosted, linux, node]
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Build with npm
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
           node-version: ${{ inputs.node_version }}
           registry-url: ${{ inputs.node_registry_url }}
           scope: ${{ inputs.node_scope }}
           check-latest: ${{ inputs.node_check_latest}}
+          
+      - name: Npm version before
+        run: npm -v
+
+      - name: Npm downgrade to 8.5.1
+        run: npm install -g npm@8.5.1
+
+      - name: Npm version after
+        run: npm -v
 
       - name: Install npm dependencies
         run: npm ci
